@@ -35,7 +35,7 @@ FEATURE_COLS_HOURLY = [
     "event_intensity",
 ]
 
-_us_holidays = holidays.US()
+_us_holidays = holidays.country_holidays("US")
 
 
 def _is_holiday(d: date) -> int:

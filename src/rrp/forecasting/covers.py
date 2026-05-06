@@ -14,6 +14,7 @@ Regime selector:
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -84,7 +85,7 @@ def _prior_forecast(
             .all()
         )
         if rows:
-            daily_sums = {}
+            daily_sums: dict[str, float] = {}
             for r in rows:
                 key = str(r.date)
                 daily_sums[key] = daily_sums.get(key, 0.0) + (r.covers_actual or 0.0)
@@ -226,6 +227,7 @@ class CoversForecaster:
                 temp_c=weather["temp_c"],
                 precip_mm=weather["precip_mm"],
                 event_intensity=event_intensity,
+                baseline_predicted=base,
             )
             result.append(base + correction)
         return result
@@ -318,7 +320,10 @@ def train_covers_models(db: Session, models_dir: Path) -> dict[str, float]:
         "verbose": -1,
         "seed": 42,
     }
-    callbacks = [lgb.early_stopping(20, verbose=False), lgb.log_evaluation(period=-1)]
+    callbacks: list[Callable[..., Any]] = [
+        lgb.early_stopping(20, verbose=False),
+        lgb.log_evaluation(period=-1),
+    ]
     model_a = lgb.train(
         params_a, ds_train_a,
         num_boost_round=300,
@@ -327,7 +332,7 @@ def train_covers_models(db: Session, models_dir: Path) -> dict[str, float]:
     )
     model_a.save_model(str(models_dir / "covers_stage_a.lgb"))
 
-    val_mape_a = mape(y_val_a, model_a.predict(X_val_a))
+    val_mape_a = mape(np.asarray(y_val_a), np.asarray(model_a.predict(X_val_a)))
 
     # Stage B
     X_b = hourly_df[FEATURE_COLS_HOURLY].values
@@ -353,7 +358,7 @@ def train_covers_models(db: Session, models_dir: Path) -> dict[str, float]:
         callbacks=callbacks,
     )
     model_b.save_model(str(models_dir / "covers_stage_b.lgb"))
-    val_mape_b = mape(y_val_b, model_b.predict(X_val_b))
+    val_mape_b = mape(np.asarray(y_val_b), np.asarray(model_b.predict(X_val_b)))
 
     # Compute clip bounds from training data
     clip_bounds: dict[str, tuple[float, float]] = {}

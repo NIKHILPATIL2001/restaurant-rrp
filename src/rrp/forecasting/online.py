@@ -30,8 +30,14 @@ Design choices that matter (and are defended by tests in tests/unit/test_online.
     rainy Tuesday own the segment. lam=10 keeps it conservative.
 
   * Residual clamp at update time. A correction can only move EWMA by at most
-    `clamp_factor * |predicted|` (default 0.5). One bad point can no longer
+    `clamp_factor * |predicted|` (default 0.20). One bad point can no longer
     poison a segment.
+
+  * Predict-time cap. The *applied* correction (EWMA + ridge) is hard-capped
+    to `predict_cap_factor * |baseline_predicted|` at predict time. This is
+    the final safety net: even if both segments accumulate stale state, the
+    visible correction is bounded by a small fraction of the baseline. It
+    also bounds the worst-case MAPE the online layer can introduce.
 
 Both components are serialised/deserialised as plain dicts so we don't need
 an external serialisation library beyond joblib.
@@ -244,7 +250,16 @@ class OnlineResidualLearner:
         temp_c: float = 15.0,
         precip_mm: float = 0.0,
         event_intensity: float = 0.0,
+        baseline_predicted: float | None = None,
     ) -> float:
+        """
+        Return the applied correction for this (weekday, hour) cell.
+
+        If `baseline_predicted` is provided, the result is clamped to
+        ±`settings.online_predict_cap_factor * |baseline_predicted|`. This is
+        the final safety net that bounds how badly the online layer can
+        regress the baseline on any single hour.
+        """
         k = self._key(weekday, hour)
         ewma_val = self._ewma[k].predict() if k in self._ewma else 0.0
         ridge_val = (
@@ -254,7 +269,11 @@ class OnlineResidualLearner:
         )
         if not (math.isfinite(ewma_val) and math.isfinite(ridge_val)):
             return 0.0
-        return ewma_val + ridge_val
+        total = ewma_val + ridge_val
+        if baseline_predicted is not None and baseline_predicted != 0.0:
+            cap = abs(baseline_predicted) * settings.online_predict_cap_factor
+            total = max(-cap, min(cap, total))
+        return total
 
     def half_life_corrections(self) -> float:
         """

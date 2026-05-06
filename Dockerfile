@@ -7,11 +7,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir -e ".[dashboard]"
+RUN pip install --no-cache-dir -e ".[dashboard,dev]"
 
 COPY . .
 
-RUN pip install --no-cache-dir -e ".[dashboard]"
+RUN pip install --no-cache-dir -e ".[dashboard,dev]"
 
 ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1

@@ -89,7 +89,10 @@ class InventoryRecommender:
         )
         if not rows:
             return 1.0
-        return float(np.mean([r.qty_actual_used for r in rows]))
+        usage = [float(r.qty_actual_used) for r in rows if r.qty_actual_used is not None]
+        if not usage:
+            return 1.0
+        return float(np.mean(usage))
 
     def _usage_std(self, ingredient_id: int, db: Session) -> float:
         rows = (
@@ -104,7 +107,10 @@ class InventoryRecommender:
         )
         if len(rows) < 2:
             return self._mean_daily_usage(ingredient_id, db) * 0.2
-        return float(np.std([r.qty_actual_used for r in rows]))
+        usage = [float(r.qty_actual_used) for r in rows if r.qty_actual_used is not None]
+        if len(usage) < 2:
+            return self._mean_daily_usage(ingredient_id, db) * 0.2
+        return float(np.std(usage))
 
     def _latest_on_hand(self, ingredient_id: int, db: Session) -> float:
         row = (
@@ -116,7 +122,9 @@ class InventoryRecommender:
             .order_by(InventoryOrder.date.desc())
             .first()
         )
-        return float(row.on_hand) if row else 0.0
+        if row is None or row.on_hand is None:
+            return 0.0
+        return float(row.on_hand)
 
     def recommend(
         self,

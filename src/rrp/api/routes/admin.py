@@ -14,10 +14,16 @@ def trigger_retrain(
     db: Session = Depends(get_db),
 ) -> RetrainResponse:
     result = run_nightly_retrain(db)
+    new_mape_raw = result.get("new_mape")
+    new_mape: float | None
+    if new_mape_raw is None:
+        new_mape = None
+    else:
+        new_mape = float(new_mape_raw)  # type: ignore[arg-type]
     return RetrainResponse(
         promoted=bool(result.get("promoted", False)),
         version=str(result.get("version")) if result.get("version") else None,
-        new_mape=float(result["new_mape"]) if result.get("new_mape") is not None else None,
+        new_mape=new_mape,
         message=(
             f"New model promoted (version {result.get('version')})."
             if result.get("promoted")

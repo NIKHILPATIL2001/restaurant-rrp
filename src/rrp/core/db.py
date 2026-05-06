@@ -18,10 +18,13 @@ try:
     def _adapt_np_int(val: np.integer) -> AsIs:
         return AsIs(repr(int(val)))
 
-    for _t in (np.float64, np.float32, np.float16):
-        register_adapter(_t, _adapt_np_float)
-    for _t in (np.int64, np.int32, np.int16, np.int8):
-        register_adapter(_t, _adapt_np_int)
+    # psycopg2's `register_adapter` is typed against `_ISQLQuoteProto`,
+    # which our small AsIs-returning callables don't formally implement.
+    # The runtime contract is correct; ignore the strict-typing arg-type.
+    for _t_float in (np.float64, np.float32, np.float16):
+        register_adapter(_t_float, _adapt_np_float)  # type: ignore[arg-type]
+    for _t_int in (np.int64, np.int32, np.int16, np.int8):
+        register_adapter(_t_int, _adapt_np_int)  # type: ignore[arg-type]
 except ImportError:
     pass
 

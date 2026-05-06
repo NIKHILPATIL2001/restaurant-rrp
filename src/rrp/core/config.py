@@ -34,12 +34,25 @@ class Settings(BaseSettings):
 
     # Online residual learner — see src/rrp/forecasting/online.py for the
     # design rationale behind each of these defaults.
-    online_alpha: float = 0.10
-    online_warmup_n: int = 5
-    online_significance_k: float = 0.5
-    online_ridge_lam: float = 10.0
-    online_ridge_warmup_n: int = 10
-    online_residual_clamp: float = 0.5  # max |residual| as fraction of |predicted|
+    #
+    # The online layer sits on top of a LightGBM baseline that already lands
+    # at ~5-7% MAPE on the synthetic dataset. With manager-noise of ±5% on
+    # each correction and only a handful of corrections per (weekday, hour)
+    # cell over a 60-day window, the online layer's signal-to-noise is low.
+    # Defaults are tuned to "do nothing unless we are sure" so the layer
+    # cannot regress the baseline on noisy days.
+    online_alpha: float = 0.06          # half-life ≈ 11.2 corrections
+    online_warmup_n: int = 12           # ramp to full strength only after evidence
+    online_significance_k: float = 1.0  # |EWMA| must exceed 1×MAD before emitting
+    online_ridge_lam: float = 50.0      # heavy regularisation; ridge rarely moves
+    online_ridge_warmup_n: int = 25
+    online_residual_clamp: float = 0.20  # max |residual| as fraction of |predicted|
+    # Hard cap on the *applied* correction at predict time, expressed as a
+    # fraction of the baseline prediction at that hour. Final safety net:
+    # even if EWMA + ridge sum to a large number, the correction visible
+    # downstream is bounded. Also bounds the worst-case MAPE regression the
+    # online layer can introduce.
+    online_predict_cap_factor: float = 0.08
 
     # Convergence test — corrected MAPE on the late window must improve over
     # the late-window baseline by at least this much, AND the worst-day

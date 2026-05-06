@@ -33,7 +33,9 @@ def get_convergence(
         "avg_corrected_mape": round(float(np.mean(corrected_all)), 4) if corrected_all else None,
     }
 
-    # Trailing-window verdict — the same definition as simulate.py.
+    # Trailing-window verdict — kept in lock-step with simulate.py's
+    # `_evaluate_convergence`: a mean no-regression check AND a per-day
+    # no-regression check (worst corrected[i] / baseline[i] over the window).
     window = settings.convergence_window_days
     factor = settings.convergence_no_regression_factor
     if len(baseline_all) >= window and len(corrected_all) >= window:
@@ -42,18 +44,27 @@ def get_convergence(
         baseline_late_mean = float(np.mean(baseline_late))
         corrected_late_mean = float(np.mean(corrected_late))
         worst_corrected = float(np.max(corrected_late))
-        improved = corrected_late_mean <= baseline_late_mean
-        no_regression = worst_corrected <= baseline_late_mean * factor
+        per_day_ratios = [
+            c / b for b, c in zip(baseline_late, corrected_late, strict=True) if b > 0
+        ]
+        worst_per_day_ratio = max(per_day_ratios) if per_day_ratios else 1.0
+
+        improved = corrected_late_mean <= baseline_late_mean * factor
+        per_day_ok = worst_per_day_ratio <= factor
+        converged = improved and per_day_ok
+
         summary["window_days"] = window
         summary["baseline_late_mean"] = round(baseline_late_mean, 4)
         summary["corrected_late_mean"] = round(corrected_late_mean, 4)
         summary["worst_corrected_late"] = round(worst_corrected, 4)
+        summary["worst_per_day_ratio"] = round(worst_per_day_ratio, 3)
         summary["mape_improvement_pct"] = round(
             100 * (baseline_late_mean - corrected_late_mean) / max(baseline_late_mean, 1e-9),
             2,
         )
-        summary["converged"] = improved and no_regression
-        summary["no_regression"] = no_regression
+        summary["no_regression_factor"] = factor
+        summary["converged"] = converged
+        summary["no_regression"] = per_day_ok
 
     return ConvergenceResponse(
         surface=surface,

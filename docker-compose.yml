@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rrp
+      POSTGRES_PASSWORD: rrp
+      POSTGRES_DB: rrp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rrp -d rrp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      RRP_DATABASE_URL: postgresql://rrp:rrp@postgres:5432/rrp
+      RRP_MODELS_DIR: /app/models
+      RRP_DATA_DIR: /app/data
+      RRP_WARMUP_DAYS: "30"
+      RRP_ENV: production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["api"]
+
+  dashboard:
+    build: .
+    environment:
+      RRP_API_URL: http://api:8000
+      RRP_ENV: production
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+    command: ["dashboard"]
+
+volumes:
+  pgdata:

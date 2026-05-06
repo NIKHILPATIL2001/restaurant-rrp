@@ -1,0 +1,59 @@
+# Cold-start priors for the Restaurant RRP system.
+# Used when there is insufficient historical data to train LightGBM.
+
+covers:
+  base_daily: 200.0
+  weekday_factor:    # 0=Mon, 6=Sun
+    0: 0.65
+    1: 0.70
+    2: 0.75
+    3: 0.85
+    4: 1.00
+    5: 1.30
+    6: 1.20
+  hour_share:        # must sum to 1.0
+    0:  0.00
+    1:  0.00
+    2:  0.00
+    3:  0.00
+    4:  0.00
+    5:  0.00
+    6:  0.01
+    7:  0.02
+    8:  0.03
+    9:  0.04
+    10: 0.05
+    11: 0.06
+    12: 0.10
+    13: 0.12
+    14: 0.08
+    15: 0.06
+    16: 0.05
+    17: 0.06
+    18: 0.08
+    19: 0.10
+    20: 0.09
+    21: 0.08
+    22: 0.06
+    23: 0.01
+  confidence_band_prior: 0.40    # ±40% when regime=prior
+  confidence_band_sparse: 0.25   # ±25% when regime=sparse
+  confidence_band_full: 0.12     # ±12% when regime=full
+
+staff:
+  # covers_per_headcount[role] = initial ratio (covers / 1 headcount)
+  covers_per_headcount:
+    server: 20.0
+    line_cook: 30.0
+    busser: 40.0
+    host: 80.0
+    dishwasher: 60.0
+    manager: 120.0
+  ewma_alpha: 0.15   # EWMA decay for ratio updates
+
+inventory:
+  default_z: 1.65    # starting safety-stock z (service level ~95%)
+  z_min: 1.00
+  z_max: 2.50
+  z_step_up: 0.10    # increase z on stockout
+  z_step_down: 0.05  # decrease z on excess waste
